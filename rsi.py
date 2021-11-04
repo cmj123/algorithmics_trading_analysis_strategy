@@ -39,4 +39,22 @@ plt.title("RSI with zone on long buy and short sell")
 # Put a legend
 plt.legend(["RSI", "Long buy signal", "Short sell zone"])
 
+# plt.show()
+
+## Define RSI - Buying Signals
+# define the threshold
+# overbuy threshold
+overbuy = 70 
+# set the lower end of the buy region
+neutral_buy = 55
+
+# Put nan values for the signal long columns
+f["signal_long"] = 0
+f["yesterday_rsi"] = f["rsi"].shift(1)
+
+# Define the Open long signal (RSI yesterday < 55 and RSI today > 55)
+f.loc[(f["rsi"]>neutral_buy)&(f["yesterday_rsi"]<neutral_buy), "signal_long"] =  1
+print(f[f["signal_long"] == 1])
+plt.figure(figsize=(15,8))
+f[["signal_long"]].plot()
 plt.show()
