@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 #                 ['#669'])
 
 # import the data
-f = yf.download(["PLUG"]) # ,"APPL"
+f = yf.download(["GOOG"]) # ,"APPL"
 # Compute the rsi 
 f["rsi"] = ta.momentum.RSIIndicator(f["Adj Close"], window=14).rsi()
 
@@ -49,12 +49,33 @@ overbuy = 70
 neutral_buy = 55
 
 # Put nan values for the signal long columns
-f["signal_long"] = 0
+f["signal_long"] = np.nan
 f["yesterday_rsi"] = f["rsi"].shift(1)
 
 # Define the Open long signal (RSI yesterday < 55 and RSI today > 55)
 f.loc[(f["rsi"]>neutral_buy)&(f["yesterday_rsi"]<neutral_buy), "signal_long"] =  1
-print(f[f["signal_long"] == 1])
+
+# Close Long Signal (RSI yesterday > 55) and (RSI today < 55) False signal
+f.loc[(f["rsi"] < neutral_buy)& (f["yesterday_rsi"] > neutral_buy), "signal_long" ] =  0
+
+# Close long Signal (RSI yesterday > 70) and (RSI today < 70) Over buy signal
+f.loc[(f["rsi"] < overbuy)& (f["yesterday_rsi"] > overbuy), "signal_long" ] =  0
+
+## Visualisation
+# Select all signal in a index to plot this point
+idx_open = f.loc[f["signal_long"]==1].loc["2010"].index 
+idx_close =  f.loc[f["signal_long"]==0].loc["2010"].index 
+
+# Adapt the size of the graph
 plt.figure(figsize=(15,8))
-f[["signal_long"]].plot()
+
+#Plot the points of the open long signal in green
+plt.scatter(f.loc[idx_open]["rsi"].index, f.loc[idx_open]["rsi"].loc["2010"], color = "#57CE95", marker="^" )
+
+# Plot the point of the close long signal in blue 
+plt.scatter(f.loc[idx_close]["rsi"].index, f.loc[idx_close]["rsi"].loc["2010"], color="#669fee", marker="o")
+# plt.scatter(f[["signal_long"]].loc["2021"].index, f[["signal_long"]].loc["2021"])
+
+# Plot the rsi to be sure that the conditions are completed
+plt.plot(f["rsi"].loc["2010"].index, f["rsi"].loc["2010"], alpha=0.35)
 plt.show()
