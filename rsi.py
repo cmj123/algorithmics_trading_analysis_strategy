@@ -1,5 +1,6 @@
 # Import library
 import numpy as np
+from numpy.core.fromnumeric import mean
 import pandas as pd
 from pandas.core.window.rolling import Window
 import yfinance as yf 
@@ -21,23 +22,23 @@ f = yf.download(["GOOG"]) # ,"APPL"
 # Compute the rsi 
 f["rsi"] = ta.momentum.RSIIndicator(f["Adj Close"], window=14).rsi()
 
-## Creating RSI zone of action
-plt.figure(figsize=(15,8))
+# ## Creating RSI zone of action
+# plt.figure(figsize=(15,8))
 
-# View RSI
-plt.plot(f["rsi"].loc["2021"])
+# # View RSI
+# plt.plot(f["rsi"].loc["2021"])
 
-# View buy zone of action
-plt.fill_between(f["rsi"].loc["2021"].index, 55,70, color="#57CE95", alpha=0.5)
+# # View buy zone of action
+# plt.fill_between(f["rsi"].loc["2021"].index, 55,70, color="#57CE95", alpha=0.5)
 
-# View sell zone of action
-plt.fill_between(f["rsi"].loc["2021"].index, 45,30, color="#CE5757", alpha=0.5)
+# # View sell zone of action
+# plt.fill_between(f["rsi"].loc["2021"].index, 45,30, color="#CE5757", alpha=0.5)
 
-# Put a title 
-plt.title("RSI with zone on long buy and short sell")
+# # Put a title 
+# plt.title("RSI with zone on long buy and short sell")
 
-# Put a legend
-plt.legend(["RSI", "Long buy signal", "Short sell zone"])
+# # Put a legend
+# plt.legend(["RSI", "Long buy signal", "Short sell zone"])
 
 # plt.show()
 
@@ -66,16 +67,91 @@ f.loc[(f["rsi"] < overbuy)& (f["yesterday_rsi"] > overbuy), "signal_long" ] =  0
 idx_open = f.loc[f["signal_long"]==1].loc["2010"].index 
 idx_close =  f.loc[f["signal_long"]==0].loc["2010"].index 
 
+# # Adapt the size of the graph
+# plt.figure(figsize=(15,8))
+
+# #Plot the points of the open long signal in green
+# plt.scatter(f.loc[idx_open]["rsi"].index, f.loc[idx_open]["rsi"].loc["2010"], color = "#57CE95", marker="^" )
+
+# # Plot the point of the close long signal in blue 
+# plt.scatter(f.loc[idx_close]["rsi"].index, f.loc[idx_close]["rsi"].loc["2010"], color="#669fee", marker="o")
+# # plt.scatter(f[["signal_long"]].loc["2021"].index, f[["signal_long"]].loc["2021"])
+
+# # Plot the rsi to be sure that the conditions are completed
+# plt.plot(f["rsi"].loc["2010"].index, f["rsi"].loc["2010"], alpha=0.35)
+# plt.show()
+
+## RSI - Sell Signal
+# Define sell threshold
+oversell = 30
+neutral_sell = 45
+
+# Put nan values for the signal short columns 
+f["signal_short"]=np.nan 
+
+
+# Define the Open short signal (RSI yesterday>45 and RSI today < 45)
+f.loc[(f["rsi"]<neutral_sell) & (f["yesterday_rsi"]>neutral_sell),"signal_short"] = -1
+
+# Define Close short signal (RSI yesterday < 45 and RSI today > 45) False signal
+f.loc[(f["rsi"]>neutral_sell) & (f["yesterday_rsi"]<neutral_sell),"signal_short"] = 0
+
+# Define Close short signal (RSI yesterday < 30 and RSI today > 30) 
+f.loc[(f["rsi"]>oversell) & (f["yesterday_rsi"]<oversell),"signal_short"] = 0
+
+## Plot sell signal
+# Get index positions for close
+idx_open = f.loc[f["signal_short"]==-1].loc["2010"].index
+idx_close = f.loc[f["signal_short"]==0].loc["2010"].index
+
+# # Adapt the size of the graph
+# # plt.figure(figsize=(15,8))
+
+# # Plot the points of the open short signal in red
+# plt.scatter(f.loc[idx_open]["rsi"].index, f.loc[idx_open]["rsi"].loc["2010"], color="#CE5757", marker="v")
+
+# # Plot the points of the close short signal in blue
+# plt.scatter(f.loc[idx_close]["rsi"].index, f.loc[idx_close]["rsi"].loc["2010"], color="black", marker="o")
+
+# # Plot the rsi to be sure that the conditions are completed
+# plt.plot(f["rsi"].loc["2010"].index, f["rsi"].loc["2010"], alpha=0.35)
+
+# # Show the graph
+# plt.show()
+
+# Define column - position
+f["Position"] = (f["signal_short"].fillna(method="ffill") + f["signal_long"].fillna(method="ffill"))
+f.dropna(thresh=10)
+
+# Plot all the signal to be sure 
+print(f.tail())
+
+# Plot all the signals
+year = "2010"
+idx_long = f.loc[f["Position"]==1].loc[year].index
+idx_short = f.loc[f["Position"]==-1].loc[year].index
+
 # Adapt the size of the graph
 plt.figure(figsize=(15,8))
 
-#Plot the points of the open long signal in green
-plt.scatter(f.loc[idx_open]["rsi"].index, f.loc[idx_open]["rsi"].loc["2010"], color = "#57CE95", marker="^" )
+# Plot the points of the open short signal in red
+plt.scatter(f.loc[idx_short]["Adj Close"].index, f.loc[idx_short]["Adj Close"].loc[year], color="#CE5757", marker="v")
 
-# Plot the point of the close long signal in blue 
-plt.scatter(f.loc[idx_close]["rsi"].index, f.loc[idx_close]["rsi"].loc["2010"], color="#669fee", marker="o")
-# plt.scatter(f[["signal_long"]].loc["2021"].index, f[["signal_long"]].loc["2021"])
+# Plot the points of the close short signal in blue
+plt.scatter(f.loc[idx_long]["Adj Close"].index, f.loc[idx_long]["Adj Close"].loc[year], color="#57CE95", marker="^")
 
-# Plot the rsi to be sure that the conditions are completed
-plt.plot(f["rsi"].loc["2010"].index, f["rsi"].loc["2010"], alpha=0.35)
+# # Plot the rsi to be sure that the conditions are completed
+plt.plot(f["Adj Close"].loc[year].index, f["Adj Close"].loc[year], alpha=0.35)
+
+# Show the graph
+plt.show()
+
+## Compute the perctange change
+f["pct"] = f["Adj Close"].pct_change(1)
+
+# Compute the return of the strategy
+f["return"] = f["pct"]*f["Position"].shift(0)
+
+f["return"].loc["2010"].cumsum().plot(figsize=(15,8))
+
 plt.show()
