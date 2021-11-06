@@ -189,3 +189,20 @@ def RSI(val, neutral, window):
 
     # Need to define the Close Long Singal (RSI yesterday > 55 and RSI today < 55) Over buy signal
     val.loc[(val["rsi"]<overbuy), (val["yesterday_rsi"] > overbuy), "signal_long"] = 0
+
+    """Short sell signal"""
+    # Set the threshold
+    oversell = 30 
+    neutral_sell = 50 - neutral
+
+    # Put nan values for the signal short columns
+    val["signal_short"] = np.nan 
+
+    # Define the Open  Short signal (RSI yesterday > 45) and (RSI today <  45)
+    val.loc[(val["rsi"] < neutral_sell) & (val["rsi_yesterday"] > neutral_sell), "signal_short"] = -1
+
+    # Define the Open  Short signal (RSI yesterday < 45) and (RSI today >  45) False Signal
+    val.loc[(val["rsi"] > neutral_sell) & (val["rsi_yesterday"] < neutral_sell), "signal_short"] = 0
+
+    # Define the Open  Short signal (RSI yesterday < 45) and (RSI today >  45) 
+    val.loc[(val["rsi"] < oversell) & (val["rsi_yesterday"] > oversell), "signal_short"] = 0
