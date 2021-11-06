@@ -155,3 +155,37 @@ f["return"] = f["pct"]*f["Position"].shift(0)
 f["return"].loc["2010"].cumsum().plot(figsize=(15,8))
 
 plt.show()
+
+## Create a function to do the RSI strategy
+def RSI(val, neutral, window):
+    """
+    Output: The function gives the returns of RSI strategy
+    Inputs: -val (type dataframe pandas): Entry values of the stock
+            -neutral (float): Value of neutrality i.e. no action zone
+            -window (float): rolling period for RSI
+    """
+
+    # Print Error if there is no column Adj Close in the dataframe
+    if "Adj Close" not in val.columns:
+        ValueError("Need to have a columns named Adj Close all computations are about this columns")
+
+    # Calcualte the RSI
+    val["rsi"] = ta.momentum.RSIIndicator(val["Adj Close"], window=window).rsi()
+
+    """Long buy Signal"""
+    # Set the threshold
+    overbuy = 70
+    neutral_buy = 50 + neutral 
+
+    # Put nan values for the signal long columns 
+    val["signal_long"] = np.nan 
+    val["yesterday_rsi"] = val["rsi"].shift(1)
+
+    # Need to define the Open Long Singal (RSI yesterday < 55 and RSI today > 55)
+    val.loc[(val["rsi"]>neutral_buy), (val["yesterday_rsi"] < neutral_buy), "signal_long"] = 1
+
+    # Need to define the Close Long Singal (RSI yesterday > 55 and RSI today < 55) False Signal
+    val.loc[(val["rsi"]<neutral_buy), (val["yesterday_rsi"] > neutral_buy), "signal_long"] = 0
+
+    # Need to define the Close Long Singal (RSI yesterday > 55 and RSI today < 55) Over buy signal
+    val.loc[(val["rsi"]<overbuy), (val["yesterday_rsi"] > overbuy), "signal_long"] = 0
