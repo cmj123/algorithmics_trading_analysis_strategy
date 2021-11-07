@@ -4,6 +4,7 @@ from numpy.core.fromnumeric import mean
 import pandas as pd
 from pandas.core.window.rolling import Window
 import yfinance as yf 
+from hurst import compute_Hc
 import matplotlib as mpl 
 import matplotlib.pyplot as plt
 from matplotlib import cycler
@@ -232,6 +233,20 @@ def RSI(val, neutral, window):
 
     return val["return"]
 
+# Create a beta function
+def beta_function(serie):
+    # Get SP500 data
+    sp500 = yf.download("^GSPC")[["Adj Close"]].pct_change()
+
+    # Change column name
+    sp500.columns = ["SP500"]
+
+    # Concatenate
+    g = pd.concat((serie,sp500), axis=1)
+
+    # Compute the beta 
+    beta = np.cov(g[[serie.name, "SP500"]].dropna().values, rowvar=False)[0][1] / np.var(g["SP500"].dropna().values)
+    return beta 
 # Create a drawdown function 
 def drawdown_function(serie):
 
@@ -309,11 +324,164 @@ def BackTest(serie):
 ## Run the RSI function
 if __name__ == "__main__":
 
-    # Calculate the return of the RSI strstegy
-    return_rsi_strategy = RSI(f,5,14)
+    # # Calculate the return of the RSI strstegy
+    # return_rsi_strategy = RSI(f,5,14)
 
-    # Compute drawdown 
-    drawdown = drawdown_function(return_rsi_strategy)
+    # # Compute drawdown 
+    # drawdown = drawdown_function(return_rsi_strategy)
 
-    # Run backtest
-    BackTest(return_rsi_strategy)
+    # # Run backtest
+    # BackTest(return_rsi_strategy)
+
+    """
+    Hurst Componenet
+        - 0.5 < Hurst < 1: Trending movement
+        - 0.5 = Hurst: Randdom Walk
+        - 0 < Hurst < 0.5: Antipersitent movement
+    """
+
+    # # Compute Hurst Exponent
+    # # Trending 
+    # arr = np.linspace(0, 300, 150) + 100
+    # hurst = compute_Hc(arr)[0]
+
+    # # Show the result
+    # plt.plot(arr)
+    # plt.title(f"{'%.2f' % hurst}")
+    # plt.show()
+
+    # # Antipersistent
+    # arr = np.cos(np.linspace(0, 300, 150) + 100)
+    # hurst = compute_Hc(arr)[0]
+
+    # # Show the result
+    # plt.plot(arr)
+    # plt.title(f"{'%.2f' % hurst}")
+    # plt.show()
+
+    # # Random Walk
+    # np.random.seed(56)
+    # arr = np.cumsum(np.random.randn(150))
+    # hurst = compute_Hc(arr)[0]
+
+    # # Show the result
+    # plt.plot(arr)
+    # plt.title(f"{'%.2f' % hurst}")
+    # plt.show()
+
+    # # Download Name.csv - ticker list 
+    # assets = pd.read_csv("Names.csv")["Symbol"]
+
+    # # Initialise our lists
+    # Statistics = []
+    # col =[]
+
+    # for fin in tqdm(assets):
+
+    #     # Get dataset
+    #     try:
+    #         print(fin)
+
+    #         # Download data for each asset
+    #         f = yf.download(fin).dropna()
+
+    #         # Create a list to put the following statistics
+    #         statistics = list()
+
+    #         # Compute the Hurst
+    #         statistics.append(compute_Hc(f["Adj Close"])[0])
+
+    #         # Compute the volatitity
+    #         statistics.append(np.sqrt(252)*f["Adj Close"].pct_change().std())
+
+    #         # Compute the beta
+    #         statistics.append(beta_function(f["Adj Close"].pct_change().dropna()))
+
+    #         # Compute statategy return
+    #         statistics.append(RSI(f,5,14).mean()*252)
+
+    #         # Put statistics list in Statistics -> have list of lists
+    #         Statistics.append(statistics)
+
+    #         # Put columns name in the list because some columns dont have 100 values
+    #         col.append(fin)
+        
+    #     # If the assets has not 100 values we pass to the next 
+    #     except:
+    #         pass
+            
+    # # Create dataframe with all the previous statistics
+    # resume = pd.DataFrame(Statistics, columns=["Hurst", "Volatility", "Beta", "Sum Strategy Returns"], index=col)
+    # resume.to_csv("resume.csv")
+    # print(resume)
+
+    # Get Statistics data
+    resume = pd.read_csv("resume.csv",index_col=0)
+
+    # Extract class of the active ticker
+    # print(resume)
+
+    # Extract asset type
+    clustering = pd.read_csv("Names.csv", index_col="Symbol")
+    del clustering["Unnamed: 0"]
+
+    # Concat resume & clustering
+    g = pd.concat([resume, clustering], axis=1).dropna()
+    print(g)
+
+    # Plot the densities
+    sns.displot(data=g, x="Sum Strategy Returns", kind="kde", hue="dummy")
+
+    # Limit the axis 
+    plt.xlim((-1.15, 1.15))
+
+    #plot the graph
+    plt.show()
+
+    # # Descrive by currency
+    # print(g.loc[g["dummy"]=="Currency"].describe())
+
+    # # Descrive by currency
+    # print(g.loc[g["dummy"]=="Crypto"].describe())
+
+    # # Descrive by currency
+    # print(g.loc[g["dummy"]=="Asset"].describe())
+
+    # Plot the density of the strategy returns by the HURST
+    g["Hurst_dum"] = "Low"
+    g.loc[g["Hurst"]>0.56, "Hurst_dum"] = "High"
+
+    # Plot the densities
+    sns.displot(data=g, x="Sum Strategy Returns", kind="kde", hue="Hurst_dum")
+
+    # Limit the axis 
+    plt.xlim((-1.15, 1.15))
+
+    #plot the graph
+    plt.show()
+
+    # Plot the density of the strategy returns by the volatility
+    g["Volatility_dum"] = "Low"
+    g.loc[g["Volatility"]>0.52, "Volatility_dum"] = "High"
+
+    # Plot the densities
+    sns.displot(data=g, x="Sum Strategy Returns", kind="kde", hue="Volatility_dum")
+
+    # Limit the axis 
+    plt.xlim((-1.15, 1.15))
+
+    #plot the graph
+    plt.show()
+
+    # Plot the density of the strategy returns by the beta
+    g["Beta_dum"] = "Low"
+    g.loc[g["Beta"]>1, "Beta_dum"] = "High"
+
+    # Plot the densities
+    sns.displot(data=g, x="Sum Strategy Returns", kind="kde", hue="Beta_dum")
+
+    # Limit the axis 
+    plt.xlim((-1.15, 1.15))
+
+    #plot the graph
+    plt.show()
