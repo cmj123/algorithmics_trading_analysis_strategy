@@ -106,6 +106,7 @@ def beta_function(serie):
     # Compute the beta 
     beta = np.cov(g[[serie.name, "SP500"]].dropna().values, rowvar=False)[0][1] / np.var(g["SP500"].dropna().values)
     return beta 
+
 # Create a drawdown function 
 def drawdown_function(serie):
 
@@ -201,71 +202,128 @@ def grid_parameters(f):
 
     return grid
 
-## Run the RSI function
-if __name__ == "__main__":
-    f = yf.download("GOOG")
-
-    # # Adapt the size
-    # plt.figure(figsize=(15,8))
-
-    # Palette for color
-    pal = sns.color_palette("light:#5A9", as_cmap=True)
-
-    # Find heatmap optimisation
-    grid = grid_parameters(f)
-
+# Create an optimisation function
+def opt(f):
+    # List for the possible values of neutral and window
     neutral_values = [i*2 for i in range(10)]
-    window_values = [i*2 for i in range(1, 11)]
+    window_values = [i*2 for i in range(1,11)]
 
     # Set some datasets
     start_train, end_train = "2017-01-01", "2019-01-01"
     start_test, end_test = "2019-01-01", "2020-01-01"
     start_valid, end_valid = "2020-01-01", "2021-01-01"
 
-    # Create the grids
-    grid_train = grid_parameters(f.loc[start_train:end_train])
-    grid_test = grid_parameters(f.loc[start_test:end_test])
+    # Initialise the list
+    resume = []
 
-    # Create a subplot
-    fig, (train, test) = plt.subplots(1,2,figsize=(30,6))
+    # Loop to add the values in the list
+    for i in range(len(neutral_values)):
+        for j in range(len(window_values)):
 
-    # Add a sup title 
-    fig.suptitle("Optimization parameters RSI")
+            # Compute the returns
+            return_train = RSI(f.loc[start_train:end_train], neutral_values[i], window_values[i])
+            return_test = RSI(f.loc[start_test:end_test], neutral_values[i], window_values[i])
 
-    # Change the color 
-    pal = sns.color_palette("light:#5A9", as_cmap=True)
+            # Compute the Sortinon
+            sortino_train = np.sqrt(252)*return_train.mean() / return_train[return_train<0].std()
+            sortino_test = np.sqrt(252)*return_test.mean()/ return_test[return_test<0].std()
 
-    # Train
-    # Add train heatmap
-    sns.heatmap(grid_train, annot=True, ax=train, xticklabels=neutral_values, yticklabels=window_values, cmap=pal) #  
+            # Create a list of list to create a result dataframe
+            values = [neutral_values[i], window_values[j], sortino_train, sortino_test]
+            resume.append(values)
 
-    # Add a title 
-    train.set_title("Train")
+    resume = pd.DataFrame(resume, columns=["Neutral", "Window", "Sortino Train", "Sortino Test"])
 
-    # Add a xlabel
-    train.set_xlabel("Neutral")
+    # Order by sortino
+    ordered_resume = resume.sort_values(by="Sortino Train", ascending=False)
+    print(ordered_resume)
 
-    # Put a ylabel
-    train.set_ylabel("Window")
+    for i in range(len(resume)):
+        # Take the best
+        best = ordered_resume.iloc[0+i:1+i,:]
 
-    # Test
-    # Add train heatmap
-    sns.heatmap(grid_test, annot=True, ax=test, xticklabels=neutral_values, yticklabels=window_values, cmap=pal) #  
+        # Compute the sortino 
+        Strain = best["Sortino Train"].values[0]
+        Stest = best["Sortino Test"].values[0]
 
-    # Add a title 
-    test.set_title("Test")
+        # Take best neutral and best window
+        best_neutral = best["Neutral"].values[0]
+        best_window = best["Window"].values[0]
 
-    # Add a xlabel
-    test.set_xlabel("Neutral")
+        # If the Sortino of the train and the test are good we stop the loop
+        if Stest >0.5 and Strain > 0.5:
+            # print(i)
+            break 
 
-    # Put a ylabel
-    test.set_ylabel("Window")
+        # If ther is not values good enough put 0 in all values
+        else:
+            best_neutral = ordered_resume.iloc[0,0]
+            best_window = ordered_resume.iloc[0,1]
+            Strain = ordered_resume.iloc[0,2]
+            Stest = ordered_resume.iloc[0,3]
+    return [best_neutral, best_window, Strain, Stest]
+
+## Run the RSI function
+if __name__ == "__main__":
+    f = yf.download("GOOG")
+
+    start_valid, end_valid = "2020-01-01", "2021-01-01"
+
+    # # Palette for color
+    # pal = sns.color_palette("light:#5A9", as_cmap=True)
+
+    # # Find heatmap optimisation
+    # grid = grid_parameters(f)
+
+    # # Create the grids
+    # grid_train = grid_parameters(f.loc[start_train:end_train])
+    # grid_test = grid_parameters(f.loc[start_test:end_test])
+
+    # # Create a subplot
+    # fig, (train, test) = plt.subplots(1,2,figsize=(30,6))
+
+    # # Add a sup title 
+    # fig.suptitle("Optimization parameters RSI")
+
+    # # Change the color 
+    # pal = sns.color_palette("light:#5A9", as_cmap=True)
+
+    # # Train
+    # # Add train heatmap
+    # sns.heatmap(grid_train, annot=True, ax=train, xticklabels=neutral_values, yticklabels=window_values, cmap=pal) #  
+
+    # # Add a title 
+    # train.set_title("Train")
+
+    # # Add a xlabel
+    # train.set_xlabel("Neutral")
+
+    # # Put a ylabel
+    # train.set_ylabel("Window")
+
+    # # Test
+    # # Add train heatmap
+    # sns.heatmap(grid_test, annot=True, ax=test, xticklabels=neutral_values, yticklabels=window_values, cmap=pal) #  
+
+    # # Add a title 
+    # test.set_title("Test")
+
+    # # Add a xlabel
+    # test.set_xlabel("Neutral")
+
+    # # Put a ylabel
+    # test.set_ylabel("Window")
     
-    # Valid
-    # return_rsi_strategy = RSI(f.loc["2010"],10,3)
-    BackTest(RSI(f.loc["2010"],10,3))
+    # # Valid
+    # # return_rsi_strategy = RSI(f.loc["2010"],10,3)
+    # BackTest(RSI(f.loc["2010"],10,3))
 
-    # # Show graph
-    plt.show()
+    # # # Show graph
+    # plt.show()
+
+    opt_result = opt(f.dropna())
+    print(f"opt result - {opt_result}")
+
+    BackTest(RSI(f.loc[start_valid:end_valid], opt_result[0],opt_result[1]))
 
     
