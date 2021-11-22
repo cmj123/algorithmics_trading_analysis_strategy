@@ -3,6 +3,7 @@ import numpy as np
 from numpy.core.fromnumeric import mean
 from scipy import optimize
 from scipy.optimize import minimize
+from scipy.stats import skew, kurtosis
 import pandas as pd
 from pandas.core.window.rolling import Window
 import yfinance as yf 
@@ -299,6 +300,27 @@ def MV_criterion(weight, Returns_data):
     criterion = sd_ret
     return criterion
 
+## Optimisation - Mean Variance Skewness Kurtosis
+def SK_criterion(weight, Returns_data):
+    """
+    output - optimization portfolio criterion
+    Inputs  - weight (type ndarray numpy): Weight for portfolio
+            - Returns_data (type ndarray numpy): Returns of stocks
+    """
+
+    Lambda_RA = 3
+    portfolio_return=np.multiply(Returns_data,np.transpose(weight))
+    portfolio_return=np.sum(portfolio_return,1)
+    mean_ret=np.mean(portfolio_return,0)
+    sd_ret=np.std(portfolio_return,0)
+    skew_ret=skew(portfolio_return,0)
+    kurt_ret=kurtosis(portfolio_return,0)
+    W=1
+    Wbar=1*(1+0.25/100)
+    criterion=np.power(Wbar,1-Lambda_RA)/(1+Lambda_RA)+np.power(Wbar,-Lambda_RA)*W*mean_ret-Lambda_RA/2*np.power(Wbar,-1-Lambda_RA)*np.power(W,2)*np.power(sd_ret,2)+Lambda_RA*(Lambda_RA+1)/(6)*np.power(Wbar,-2-Lambda_RA)*np.power(W,3)*skew_ret-Lambda_RA*(Lambda_RA+1)*(Lambda_RA+2)/(24)*np.power(Wbar,-3-Lambda_RA)*np.power(W,4)*kurt_ret
+    criterion=-criterion
+    return criterion
+
 ## Run the RSI function
 if __name__ == "__main__":
     file_path = "./res.csv"
@@ -371,22 +393,30 @@ if __name__ == "__main__":
 
     Bounds = [(0,1) for i in range(0, n)]
 
-    # Optimisation problem solving - sortino
-    res_SR = minimize(SR_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), 
-                    bounds=Bounds, constraints=cons, options={'disp':False})
+    # # Optimisation problem solving - sortino
+    # res_SR = minimize(SR_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), 
+    #                 bounds=Bounds, constraints=cons, options={'disp':False})
 
-    # Result for visualisatiob
-    X = res_SR.x
-    print(np.round(X, 3))
-    # sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
-    # BackTest(sr)
+    # # Result for visualisatiob
+    # X = res_SR.x
+    # print(np.round(X, 3))
+    # # sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
+    # # BackTest(sr)
 
     # Optimisation problem solving - mean - variance
-    res_MV = minimize(MV_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), bounds=Bounds, constraints=cons, options={'disp':False})
-    X = res_MV.x
+    # res_MV = minimize(MV_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), bounds=Bounds, constraints=cons, options={'disp':False})
+    # X = res_MV.x
+    # print(np.round(X, 3))
     # sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
     # BackTest(sr)
+    
+
+    # Optimisation problem solving - mean - variance - skewness optimisation
+    res_MV = minimize(SK_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), bounds=Bounds, constraints=cons, options={'disp':False})
+    X = res_MV.x
     print(np.round(X, 3))
+    sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
+    BackTest(sr)
 
 
     
