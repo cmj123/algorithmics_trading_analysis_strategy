@@ -284,6 +284,21 @@ def SR_criterion(weight, returns):
     Sortino = -mu/sigma
     return Sortino
 
+## Min Variance Optimization
+def MV_criterion(weight, Returns_data):
+    """
+    Output: optimisation portfolio criterion
+    Inputs: weight (type ndarray numpy): Weights for portfolio
+            Return_data (type ndarray numpy): Return of stocks
+    """
+
+    portfolio_return = np.multiply(Returns_data, np.transpose(weight))
+    portfolio_return = np.sum(portfolio_return,1)
+    mean_ret = np.mean(portfolio_return,0)
+    sd_ret = np.std(portfolio_return, 0)
+    criterion = sd_ret
+    return criterion
+
 ## Run the RSI function
 if __name__ == "__main__":
     file_path = "./res.csv"
@@ -345,7 +360,7 @@ if __name__ == "__main__":
         # RSI returns
         strategies[f"{col}"] = RSI(l.loc[start_train:], best_neutral, int(best_window))
 
-    print(strategies.dropna())
+    # print(strategies.dropna().head())
 
     n = len(strategies.transpose())
 
@@ -356,14 +371,22 @@ if __name__ == "__main__":
 
     Bounds = [(0,1) for i in range(0, n)]
 
-    # Optimisation problem solving
+    # Optimisation problem solving - sortino
     res_SR = minimize(SR_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), 
                     bounds=Bounds, constraints=cons, options={'disp':False})
 
     # Result for visualisatiob
     X = res_SR.x
-    # print(X)
-    sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
-    BackTest(sr)
+    print(np.round(X, 3))
+    # sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
+    # BackTest(sr)
+
+    # Optimisation problem solving - mean - variance
+    res_MV = minimize(MV_criterion, x0, method="SLSQP", args=(strategies.loc[start_train:end_test].dropna()), bounds=Bounds, constraints=cons, options={'disp':False})
+    X = res_MV.x
+    # sr = np.multiply(strategies.loc[start_valid:end_valid],X).sum(axis=1)
+    # BackTest(sr)
+    print(np.round(X, 3))
+
 
     
